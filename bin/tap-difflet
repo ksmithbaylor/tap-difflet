@@ -29,6 +29,8 @@ function output(str) {
 
 var timer   = hirestime();
 var errors  = [];
+var currentTest, lastReportedTest;
+var report = [];
 
 tap.on('comment', function(comment) {
     if (/^tests\s+[0-9]+$/gi.test(comment)) {
@@ -45,20 +47,24 @@ tap.on('comment', function(comment) {
         return;
     }
     else {
-        output('\n');
         comment = chalk.white.bold(comment);
+        currentTest = chalk.white.bold(comment);
     }
-
-    output('  ' + comment + '\n');
 });
 
 tap.on('assert', function(res) {
   if (res.ok) {
-    output('    ' + chalk.green.bold('✓') + ' ' + chalk.gray(res.name) + '\n');
+    output(chalk.green.bold('.'));
   } else {
-    assert = chalk.red.bold('⨯ ' + res.name + '\n');
-    errors.push(chalk.white(assert));
-    output('    ' + errors[errors.length-1]);
+    output(chalk.red.bold('⨯'));
+    assert = chalk.red.bold('⨯ ' + res.name);
+    errors.push(currentTest + '\n' + chalk.white(assert) + '\n');
+    if (lastReportedTest === currentTest) {
+      report.push('   ' + chalk.white(assert));
+    } else {
+      report.push(currentTest + '\n   ' + chalk.white(assert));
+    }
+    lastReportedTest = currentTest;
   }
 });
 
@@ -66,6 +72,7 @@ tap.on('extra', function(res) {
   if (res !== '') {
     if (res.indexOf('---') === 0){
       errors.push(chalk.gray(res));
+      report.push(chalk.gray(res));
       output(errors[errors.length-1]);
       output('\n');
     } else {
@@ -80,12 +87,13 @@ tap.on('results', function(res) {
   var time  = prettyms(timer());
   output('\n');
 
+  report.forEach(output);
+
   output(chalk.green.bold(Math.max(0,count-errors.length) + ' passing') + chalk.gray(' (' + time + ')'));
   if (errors.length) {
     output(chalk.red.bold('\n' + errors.length + ' failing'));
+    output(errors);
   }
-
-  output('\n\n');
 });
 
 tap.on('diag', function (diag) {
@@ -143,8 +151,7 @@ tap.on('diag', function (diag) {
     str = '\n' + str;
     str = str.replace(/\n/g, '\n      ');
     errors[errors.length-1] += str;
-    output(str);
-    output('\n');
+    report.push(str + '\n\n');
   }
 
 });
@@ -153,6 +160,7 @@ tap.on('diag', function (diag) {
 
 process.stdin.pipe(dup).pipe(process.stdout);
 process.on('exit', function () {
+  console.log('\n');
   process.exit(errors.length);
 });
 
